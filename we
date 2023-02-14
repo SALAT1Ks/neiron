@@ -1,0 +1,40 @@
+import telebot 
+import tensorflow_hub as hub 
+import tensorflow as tf 
+from PIL import Image 
+import numpy 
+import matplotlib.pylab as plt 
+from googletrans import Translator 
+bot = telebot.TeleBot('5636450951:AAF-EULp65fIcGQmz8suRrW9xGDSyMf4xqY') 
+ 
+ 
+@bot.message_handler(content_types=['photo']) 
+def handle(message): 
+ 
+    fileID = message.photo[-1].file_id 
+    file_info = bot.get_file(fileID) 
+    downloaded_file = bot.download_file(file_info.file_path) 
+    with open("image.jpg", 'wb') as new_file: 
+        new_file.write(downloaded_file) 
+ 
+    m = tf.keras.Sequential([ 
+        hub.KerasLayer("https://tfhub.dev/google/imagenet/resnet_v2_50/classification/4", 
+                       input_shape=(224, 224) + (3,)) 
+    ]) 
+    grace_hopper = Image.open("image.jpg").resize((224, 224)) 
+    grace_hopper = numpy.array(grace_hopper) / 255.0 
+    m.build([None, 224, 224, 3]) 
+    result = m.predict(grace_hopper[numpy.newaxis, ...]) 
+    predicted_class = tf.math.argmax(result[0], axis=-1) 
+    labels_path = tf.keras.utils.get_file('ImageNetLabels.txt', 
+                                          'https://storage.googleapis.com/download.tensorflow.org/data/ImageNetLabels.txt') 
+    imagenet_labels = numpy.array(open(labels_path).read().splitlines()) 
+    plt.imshow(grace_hopper) 
+    plt.axis('off') 
+    predicted_class_name = imagenet_labels[predicted_class] 
+    translator = Translator() 
+    result = translator.translate(predicted_class_name, src='en', dest='ru') 
+    bot.send_message(message.from_user.id, result.text) 
+ 
+ 
+bot.polling(none_stop=True, interval=0)
