@@ -1,0 +1,81 @@
+import telebot
+import numpy as np
+from PIL import Image
+from keras.preprocessing import image
+from keras.applications.vgg16 import VGG16
+from keras.applications.vgg16 import preprocess_input
+from keras.applications.imagenet_utils import decode_predictions
+
+
+TOKEN = '6207815031:AAGtijqh7b0tLMnDPgISyEJ7VpxRsVW2yQA'
+bot = telebot.TeleBot(TOKEN)
+
+
+
+@bot.message_handler(content_types=["photo"])
+def photo(message):
+
+
+   idphoto = message.photo[0].file_id
+   bot.send_photo(message.chat.id, idphoto )
+   bot.send_message(message.chat.id, 're')
+
+
+   # Загрузка предобученной модели VGG16
+   model = VGG16(weights='imagenet')
+
+   # Загрузка изображения
+   img_path = 'idphoto'
+   img = Image.open(img_path)
+
+   # Изменение размера изображения
+   img = img.resize((224, 224))
+
+   # Преобразование изображения в массив
+   x = np.asarray(img, dtype='float32')
+   x = np.expand_dims(x, axis=0)
+   x = preprocess_input(x)
+
+   # Предсказание класса изображения
+   preds = model.predict(x)
+
+   # Декодирование предсказаний
+   pred_classes = decode_predictions(preds, top=3)[0]
+
+   # Вывод результата
+#   print('Найденные классы:')
+#   for class_name, class_description, class_score in pred_classes:
+#      print(f'{class_name}: {class_description} (вероятность: {class_score:.2f})')
+   for class_name, class_description, class_score in pred_classes:
+      bot.send_message(message.chat.id, f'{class_name}: {class_description} (вероятность: {class_score:.2f})')
+
+bot.polling()
+
+import openai
+from aiogram import Bot, types
+from aiogram.dispatcher import Dispatcher
+from aiogram.utils import executor
+
+TOKEN = '6207815031:AAGtijqh7b0tLMnDPgISyEJ7VpxRsVW2yQA'
+openai.api_key = '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'
+
+bot = Bot(TOKEN)
+dp = Dispatcher(bot)
+
+@dp.message_handler()
+async def send (message : types.Message):
+    response = openai.Completion.create(
+    model="text-davinci-003",
+    prompt=message.text,
+    temperature=0.9,
+    max_tokens=1000,
+    top_p = 1,
+    frequency_penalty=0.0,
+    presence_penalty=0.6,
+    stop=["You: "]
+    )
+
+    await message.answer(response['choices'][0]['text'])
+
+
+executor.start_polling(dp, skip_updates=True)
