@@ -1,31 +1,52 @@
 import telebot
+from telegram.ext import Updater, CommandHandler, MessageHandler
 import numpy as np
+import requests
 from PIL import Image
+import io
 from keras.preprocessing import image
 from keras.applications.vgg16 import VGG16
 from keras.applications.vgg16 import preprocess_input
 from keras.applications.imagenet_utils import decode_predictions
+import openai
+from aiogram import Bot, types
+from aiogram.dispatcher import Dispatcher
+from aiogram.utils import executor
+
+
 
 
 TOKEN = '6207815031:AAGtijqh7b0tLMnDPgISyEJ7VpxRsVW2yQA'
+openai.api_key = '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'
+
 bot = telebot.TeleBot(TOKEN)
-
-
+dp = Dispatcher(bot)
 
 @bot.message_handler(content_types=["photo"])
 def photo(message):
+   # получаем ID фотографии
+   photo_id = message.photo[-1].file_id
+   # получаем ссылку на файл фотографии
+   file_path = bot.get_file(photo_id).file_path
+   file_url = f"https://api.telegram.org/file/bot{TOKEN}/{file_path}"
+   # скачиваем файл фотографии
+   response = requests.get(file_url)
+   with open('photo.jpg', 'wb') as f:
+      f.write(response.content)
 
+   # сохраняем фотографию в оперативной памяти
+   buffer = io.BytesIO(response.content)
+   img = Image.open(buffer)
 
    idphoto = message.photo[0].file_id
-   bot.send_photo(message.chat.id, idphoto )
+   bot.send_photo(message.chat.id, idphoto)
    bot.send_message(message.chat.id, 're')
-
 
    # Загрузка предобученной модели VGG16
    model = VGG16(weights='imagenet')
 
    # Загрузка изображения
-   img_path = 'idphoto'
+   img_path = 'photo.jpg'
    img = Image.open(img_path)
 
    # Изменение размера изображения
@@ -43,24 +64,9 @@ def photo(message):
    pred_classes = decode_predictions(preds, top=3)[0]
 
    # Вывод результата
-#   print('Найденные классы:')
-#   for class_name, class_description, class_score in pred_classes:
-#      print(f'{class_name}: {class_description} (вероятность: {class_score:.2f})')
    for class_name, class_description, class_score in pred_classes:
       bot.send_message(message.chat.id, f'{class_name}: {class_description} (вероятность: {class_score:.2f})')
 
-bot.polling()
-
-import openai
-from aiogram import Bot, types
-from aiogram.dispatcher import Dispatcher
-from aiogram.utils import executor
-
-TOKEN = '6207815031:AAGtijqh7b0tLMnDPgISyEJ7VpxRsVW2yQA'
-openai.api_key = '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'
-
-bot = Bot(TOKEN)
-dp = Dispatcher(bot)
 
 @dp.message_handler()
 async def send (message : types.Message):
@@ -79,3 +85,6 @@ async def send (message : types.Message):
 
 
 executor.start_polling(dp, skip_updates=True)
+
+bot.infinity_polling()
+
